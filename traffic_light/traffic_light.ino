@@ -2,8 +2,9 @@
 #define YELLOW_LED_PIN 3 // желтый (синий)
 #define RED_LED_PIN 2 // красный 
 
-#define SET_AUTO_MODE 'a'
-#define SET_MANUAL_MODE 'm'
+//#define SET_AUTO_MODE 'a'
+//#define SET_MANUAL_MODE 'm'
+#define CHANGE_MODE 'c'
 
 #define SET_MANUAL_RED 'r'
 #define SET_MANUAL_GREEN 'g'
@@ -40,6 +41,7 @@ void setup() {
 
 void func_for_auto_mode() {
   long int current_millis = millis();
+  //Serial.println("Auto");
     
   // зеленый светится
   if (iteration == 0) {
@@ -106,48 +108,34 @@ void func_for_manual_mode() {
   long int start_manual = millis();
   turn_off_all_LEDs();
 
-  if (manual_duration - (millis() - start_manual) > 0) { // если не прошло 60 секунд
-    if (Serial.available() > 0) {
-      char command_color = Serial.read();
+  Serial.println("Manual");
 
-      if (command_color == SET_MANUAL_RED) {
-        is_green = false;
-        is_red = true;
+  if (manual_duration - start_manual > 0) { // если не прошло 60 секунд
+    read_commands();
 
-        turn_off_all_LEDs();
-        digitalWrite(RED_LED_PIN, HIGH);
-        Serial.print("RED");
-      }
+    if (is_red) {
+      //is_green = false;
+      //is_red = true;
 
-      else if (command_color == SET_MANUAL_GREEN) {
-        is_red = false;
-        is_green = true;
+      turn_off_all_LEDs();
+      digitalWrite(RED_LED_PIN, HIGH);
+      Serial.println("RED");
+    }
 
-        turn_off_all_LEDs();
-        digitalWrite(GREEN_LED_PIN, HIGH);
-        Serial.print("GREEN");
-      }
+    else if (is_green) {
+      //is_red = false;
+      //is_green = true;
 
-      else { // если 60 сек прошло
-        turn_off_all_LEDs();
-        digitalWrite(YELLOW_LED_PIN, HIGH);
-        
-        long int current_millis_yellow = millis();
-
-        if (current_millis_yellow - previous_millis >= yellow_for_manual) {
-          digitalWrite(YELLOW_LED_PIN, LOW);
-          previous_millis = current_millis_yellow; 
-        }
-
-        is_manual = false;
-        is_auto = true;
-      }
+      turn_off_all_LEDs();
+      digitalWrite(GREEN_LED_PIN, HIGH);
+      Serial.println("GREEN");
     }
   }
 
   else {
     turn_off_all_LEDs();
     digitalWrite(YELLOW_LED_PIN, HIGH);
+    Serial.print("60sec");
         
     long int current_millis_yellow = millis();
     
@@ -167,28 +155,48 @@ void turn_off_all_LEDs() {
   digitalWrite(GREEN_LED_PIN, LOW);
 }
 
-void update_state() {
+void read_commands() {
   if (Serial.available() > 0) {
     char command = Serial.read();
-    switch (command) {
-      case SET_AUTO_MODE:
-        state = STATE_AUTO;
-        iteration = 0;
-        is_manual = false;
-        is_auto = true;
-        break;
 
-        case SET_MANUAL_MODE:
+    switch (command) {
+      case CHANGE_MODE:
+        if (is_auto == true) {
           state = STATE_MANUAL;
+
           is_auto = false;
           is_manual = true;
+
           break;
+        }
+
+        else if(is_manual == true) {
+          state = STATE_AUTO;
+
+          iteration = 0;
+          is_manual = false;
+          is_auto = true;
+
+          break;
+        }
+
+      case SET_MANUAL_RED:
+        is_green = false;
+        is_red = true;
+
+        break;
+
+      case SET_MANUAL_GREEN:
+        is_red = false;
+        is_green = true;
+
+        break;
     }
   }
 }
 
 void loop() {
-    update_state();
+    read_commands();
 
     if (is_auto) {
       func_for_auto_mode();
