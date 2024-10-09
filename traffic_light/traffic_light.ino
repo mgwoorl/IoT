@@ -25,94 +25,176 @@ long int yellow_for_manual = 3000; // перевод через желтый (с
 
 long int manual_duration = 60000; // 60 секунд
 
-void setup() {
-    Serial.begin(9600);
+bool is_auto = true;
+bool is_manual = false;
+bool is_green = false;
+bool is_red = false;
 
-    pinMode(RED_LED_PIN, OUTPUT);
-    pinMode(YELLOW_LED_PIN, OUTPUT);
-    pinMode(GREEN_LED_PIN, OUTPUT);
+void setup() {
+  Serial.begin(9600);
+
+  pinMode(RED_LED_PIN, OUTPUT);
+  pinMode(YELLOW_LED_PIN, OUTPUT);
+  pinMode(GREEN_LED_PIN, OUTPUT);
 }
 
 void func_for_auto_mode() {
-    long int current_millis = millis();
+  long int current_millis = millis();
     
-    // зеленый светится
-    if (iteration == 0) {
-        digitalWrite(GREEN_LED_PIN, HIGH);
+  // зеленый светится
+  if (iteration == 0) {
+    digitalWrite(GREEN_LED_PIN, HIGH);
         
-        if (current_millis - previous_millis >= green_light) {
-            previous_millis = current_millis;
-            iteration++; // переходим к след. этапу
-        }
+    if (current_millis - previous_millis >= green_light) {
+      previous_millis = current_millis;
+      iteration++; // переходим к след. этапу
     }
+  }
     
-    // зеленый мигает
-    else if (iteration == 1) {
-      if ((current_millis / 500) % 2 == 0) {
-        digitalWrite(GREEN_LED_PIN, HIGH);
-      } 
+  // зеленый мигает
+  else if (iteration == 1) {
+    if ((current_millis / 500) % 2 == 0) {
+      digitalWrite(GREEN_LED_PIN, HIGH);
+    } 
             
-      else {
-        digitalWrite(GREEN_LED_PIN, LOW);
+    else {
+      digitalWrite(GREEN_LED_PIN, LOW);
+    }
+
+    if (current_millis - previous_millis >= green_blink) {
+      previous_millis = current_millis;
+      digitalWrite(GREEN_LED_PIN, LOW);
+      iteration++;
+    }
+  }
+    
+  // желтый светится
+  else if (iteration == 2) {     
+    digitalWrite(YELLOW_LED_PIN, HIGH);
+        
+    if (current_millis - previous_millis >= yellow_light) {
+      previous_millis = current_millis;
+      digitalWrite(YELLOW_LED_PIN, LOW);
+      iteration++; // переходим к след. этапу
+    }
+  }
+    
+  // красный светится
+  else if (iteration == 3) {
+    digitalWrite(RED_LED_PIN, HIGH);
+        
+    if (current_millis - previous_millis >= red_light) {
+      previous_millis = current_millis;
+      digitalWrite(RED_LED_PIN, LOW);
+      iteration++; // переходим к след. этапу
+    }
+  }
+    
+  // желтый снова светится
+  else if (iteration == 4) {
+    digitalWrite(YELLOW_LED_PIN, HIGH);
+        
+    if (current_millis - previous_millis >= yellow_light) {
+      previous_millis = current_millis;
+      digitalWrite(YELLOW_LED_PIN, LOW);
+      iteration = 0; // возвращаемся к началу
+    }
+  }
+}
+
+void func_for_manual_mode() {
+  long int start_manual = millis();
+  turn_off_all_LEDs();
+
+  if (manual_duration - (millis() - start_manual) > 0) { // если не прошло 60 секунд
+    if (Serial.available() > 0) {
+      char command_color = Serial.read();
+
+      if (command_color == SET_MANUAL_RED) {
+        is_green = false;
+        is_red = true;
+
+        turn_off_all_LEDs();
+        digitalWrite(RED_LED_PIN, HIGH);
+        Serial.print("RED");
       }
 
-      if (current_millis - previous_millis >= green_blink) {
-        previous_millis = current_millis;
-        digitalWrite(GREEN_LED_PIN, LOW);
-        iteration++;
+      else if (command_color == SET_MANUAL_GREEN) {
+        is_red = false;
+        is_green = true;
+
+        turn_off_all_LEDs();
+        digitalWrite(GREEN_LED_PIN, HIGH);
+        Serial.print("GREEN");
+      }
+
+      else { // если 60 сек прошло
+        turn_off_all_LEDs();
+        digitalWrite(YELLOW_LED_PIN, HIGH);
+        
+        long int current_millis_yellow = millis();
+
+        if (current_millis_yellow - previous_millis >= yellow_for_manual) {
+          digitalWrite(YELLOW_LED_PIN, LOW);
+          previous_millis = current_millis_yellow; 
+        }
+
+        is_manual = false;
+        is_auto = true;
       }
     }
-    
-    // желтый светится
-    else if (iteration == 2) {     
-        digitalWrite(YELLOW_LED_PIN, HIGH);
+  }
+
+  else {
+    turn_off_all_LEDs();
+    digitalWrite(YELLOW_LED_PIN, HIGH);
         
-        if (current_millis - previous_millis >= yellow_light) {
-            previous_millis = current_millis;
-            digitalWrite(YELLOW_LED_PIN, LOW);
-            iteration++; // переходим к след. этапу
-        }
-    }
+    long int current_millis_yellow = millis();
     
-    // красный светится
-    else if (iteration == 3) {
-        digitalWrite(RED_LED_PIN, HIGH);
-        
-        if (current_millis - previous_millis >= red_light) {
-            previous_millis = current_millis;
-            digitalWrite(RED_LED_PIN, LOW);
-            iteration++; // переходим к след. этапу
-        }
+    if (current_millis_yellow - previous_millis >= yellow_for_manual) {
+      digitalWrite(YELLOW_LED_PIN, LOW);
+      previous_millis = current_millis_yellow;
     }
-    
-    // желтый снова светится
-    else if (iteration == 4) {
-        digitalWrite(YELLOW_LED_PIN, HIGH);
-        
-        if (current_millis - previous_millis >= yellow_light) {
-            previous_millis = current_millis;
-            digitalWrite(YELLOW_LED_PIN, LOW);
-            iteration = 0; // возвращаемся к началу
-        }
-    }
+
+    is_manual = false;
+    is_auto = true;
+  }
+}
+
+void turn_off_all_LEDs() {
+  digitalWrite(RED_LED_PIN, LOW);
+  digitalWrite(YELLOW_LED_PIN, LOW);
+  digitalWrite(GREEN_LED_PIN, LOW);
 }
 
 void update_state() {
-    if (Serial.available() > 0) {
-        char command = Serial.read();
-        switch (command) {
-            case SET_AUTO_MODE:
-                state = STATE_AUTO;
-                iteration = 0;
-                break;
+  if (Serial.available() > 0) {
+    char command = Serial.read();
+    switch (command) {
+      case SET_AUTO_MODE:
+        state = STATE_AUTO;
+        iteration = 0;
+        is_manual = false;
+        is_auto = true;
+        break;
 
-            case SET_MANUAL_MODE:
-                state = STATE_MANUAL;
-                break;
-        }
+        case SET_MANUAL_MODE:
+          state = STATE_MANUAL;
+          is_auto = false;
+          is_manual = true;
+          break;
     }
+  }
 }
 
 void loop() {
-    func_for_auto_mode();
+    update_state();
+
+    if (is_auto) {
+      func_for_auto_mode();
+    }
+
+    else if (is_manual) {
+      func_for_manual_mode();
+    }
 }
